@@ -1,19 +1,82 @@
-# 🎬 Movies dataset template
+# ⚡ Прогноз мощности ветряной электростанции (ВЭС)
 
-A simple Streamlit app showing movie data from [The Movie Database (TMDB)](https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata). 
+Это приложение для прогнозирования мощности ветряной электростанции на основе данных о погоде от OpenWeatherMap API. Оно включает консольный скрипт и веб-интерфейс на Streamlit.
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://movies-dataset-template.streamlit.app/)
+## Возможности
 
-### How to run it on your own machine
+- Получение прогноза погоды (скорость ветра) для заданных координат.
+- Расчет мощности на основе загруженной таблицы мощности генераторов.
+- Визуализация результатов в виде таблицы и графика.
+- Веб-интерфейс для удобного ввода параметров и просмотра прогноза.
 
-1. Install the requirements
+## Структура проекта
 
-   ```
-   $ pip install -r requirements.txt
-   ```
+- `power_forecast.py` — консольный скрипт для прогноза.
+- `forecast_app.py` — веб-приложение на Streamlit.
+- `data/` — папка с данными (примеры CSV, placeholder).
+- `requirements.txt` — зависимости Python.
+- `Таблица мощности для прогноза.xlsx` — пример таблицы мощности (создан для тестирования).
 
-2. Run the app
+## Установка и запуск
 
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+### 1. Установка зависимостей
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Получение API-ключа
+
+Зарегистрируйтесь на [OpenWeatherMap](https://openweathermap.org/api) и получите бесплатный API-ключ.
+
+### 3. Подготовка данных
+
+- Создайте Excel-файл с таблицей мощности: столбцы "Скорость ветра (м/с)" и "Мощность (кВт)".
+- Пример файла: `Таблица мощности для прогноза.xlsx`.
+
+### 4. Запуск консольного скрипта
+
+```bash
+python3 power_forecast.py
+```
+
+Результаты сохранятся в `hourly_power_forecast.xlsx`.
+
+### 5. Запуск веб-приложения
+
+```bash
+streamlit run forecast_app.py
+```
+
+Откройте http://localhost:8501 в браузере.
+
+## Использование веб-приложения
+
+1. Введите API-ключ OpenWeatherMap.
+2. Укажите координаты (широта, долгота) и количество генераторов.
+3. Загрузите Excel-файл с таблицей мощности.
+4. Нажмите "Запустить прогноз".
+5. Просмотрите таблицу и график результатов.
+
+## Пример результатов
+
+После запуска прогноза вы увидите:
+- Таблицу с временем, скоростью ветра, мощностью одного генератора и общей мощностью.
+- График общей мощности по времени.
+
+## Зависимости
+
+- requests
+- pandas
+- numpy
+- openpyxl
+- streamlit
+- altair
+
+## Лицензия
+
+MIT License. См. файл LICENSE.
+
+## Контакты
+
+Если есть вопросы или предложения, создайте issue в репозитории.
