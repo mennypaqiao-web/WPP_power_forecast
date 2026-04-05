@@ -1,9 +1,10 @@
+import io
 import streamlit as st
 import pandas as pd
 import numpy as np
 import requests
-import altair as alt
 from datetime import datetime, timedelta, timezone
+import altair as alt
 
 st.set_page_config(page_title="Прогноз мощности ВЭС", page_icon="⚡")
 st.title("⚡ Прогноз мощности ветряной электростанции")
@@ -134,6 +135,11 @@ num_generators = st.sidebar.number_input("Количество генерато�
 
 uploaded_file = st.sidebar.file_uploader("Загрузите Excel-файл с таблицей мощности", type=["xlsx"])
 
+# Кэширование API
+@st.cache_data
+def cached_get_weather(api_key, lat, lon):
+    return get_weather(api_key, lat, lon)
+
 if st.sidebar.button("Запустить прогноз"):
     if not api_key:
         st.error("Введите API-ключ!")
@@ -147,7 +153,7 @@ if st.sidebar.button("Запустить прогноз"):
             st.subheader("Таблица мощности генератора")
             st.dataframe(power_table_df)
 
-            data = get_weather(api_key, lat, lon)
+            data = cached_get_weather(api_key, lat, lon)
             df_hourly = prepare_hourly_wind(data)
             df_hourly = predict_power(df_hourly, power_table_df, num_generators)
 
@@ -155,18 +161,69 @@ if st.sidebar.button("Запустить прогноз"):
             st.subheader("Результаты прогноза")
             st.dataframe(df_hourly[["Время_UTC+1", "Порывы_ветра_м_с", "Мощность_кВт", "Общая_мощность_кВт"]])
 
-            st.subheader("График мощности")
-            power_chart = alt.Chart(df_hourly).mark_line(color="green").encode(
-                x=alt.X("Время_UTC+1:T", title="Время"),
-                y=alt.Y("Общая_мощность_кВт:Q", title="Общая мощность (кВт)"),
-            ).properties(height=400)
-            st.altair_chart(power_chart, use_container_width=True)
+            def to_excel_bytes(df: pd.DataFrame) -> bytes:
+                df_export = df.copy()
+                df_export["Время_UTC"] = df_export["Время_UTC"].dt.tz_localize(None)
+                df_export["Время_UTC+1"] = df_export["Время_UTC+1"].dt.tz_localize(None)
 
-            st.subheader("Кривая мощности")
+                daily_summary = (
+                    df_export
+                    .groupby(df_export["Время_UTC+1"].dt.date)
+                    .agg(
+                        Средняя_скорость_ветра_м_с=("Порывы_ветра_м_с", "mean"),
+                        Средняя_мощность_кВт=("Мощность_кВт", "mean"),
+                        Суммарная_мощность_кВт=("Общая_мощность_кВт", "sum"),
+                    )
+                    .reset_index()
+                )
+                daily_summary["Дата"] = daily_summary["Время_UTC+1"].astype(str)
+                daily_summary = daily_summary[["Дата", "Средняя_скорость_ветра_м_с", "Средняя_мощность_кВт", "Суммарная_мощность_кВт"]]
+
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df_export.to_excel(writer, index=False, sheet_name="5-дневный прогноз")
+                    daily_summary.to_excel(writer, index=False, sheet_name="Итоги по дням")
+
+                return output.getvalue()
+
+            excel_bytes = to_excel_bytes(df_hourly)
+            st.download_button(
+                label="Скачать прогноз за 5 дней в Excel",
+                data=excel_bytes,
+                file_name="forecast_5day.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("График скорости ветра")
+                wind_chart = alt.Chart(df_hourly).mark_line(color="blue").encode(
+                    x=alt.X(
+                        "Время_UTC+1:T",
+                        title="Дата",
+                        axis=alt.Axis(format="%Y-%m-%d %H:%M", labelAngle=-45, labelFlush=True),
+                    ),
+                    y=alt.Y("Порывы_ветра_м_с:Q", title="Скорость ветра (м/с)"),
+                ).properties(height=300)
+                st.altair_chart(wind_chart, use_container_width=True)
+
+            with col2:
+                st.subheader("График мощности")
+                power_chart = alt.Chart(df_hourly).mark_line(color="green").encode(
+                    x=alt.X(
+                        "Время_UTC+1:T",
+                        title="Дата",
+                        axis=alt.Axis(format="%Y-%m-%d %H:%M", labelAngle=-45, labelFlush=True),
+                    ),
+                    y=alt.Y("Общая_мощность_кВт:Q", title="Общая мощность (кВт)"),
+                ).properties(height=300)
+                st.altair_chart(power_chart, use_container_width=True)
+
+            st.subheader("Кривая мощности генератора")
             curve_chart = alt.Chart(power_table_df).mark_line(point=True).encode(
                 x=alt.X("Скорость ветра (м/с):Q", title="Скорость ветра (м/с)"),
                 y=alt.Y("Мощность (кВт):Q", title="Мощность (кВт)"),
-            ).properties(height=400)
+            ).properties(height=300)
             st.altair_chart(curve_chart, use_container_width=True)
 
         except Exception as e:
