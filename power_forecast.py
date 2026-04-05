@@ -139,11 +139,13 @@ def calculate_power(wind_speed, power_df):
 # =====================
 # ПРОГНОЗ МОЩНОСТИ
 # =====================
-def predict_power(df_hourly: pd.DataFrame, power_table_df: pd.DataFrame) -> pd.DataFrame:
+def predict_power(df_hourly: pd.DataFrame, power_table_df: pd.DataFrame, num_generators: int = None) -> pd.DataFrame:
+    if num_generators is None:
+        num_generators = NUM_GENERATORS
     df_hourly["Мощность_кВт"] = df_hourly["Порывы_ветра_м_с"].apply(
         lambda x: calculate_power(x, power_table_df)
     )
-    df_hourly["Общая_мощность_кВт"] = df_hourly["Мощность_кВт"] * NUM_GENERATORS
+    df_hourly["Общая_мощность_кВт"] = df_hourly["Мощность_кВт"] * num_generators
     return df_hourly
 
 # =====================

@@ -1,53 +1,33 @@
-import io
-import streamlit as st
 import pandas as pd
-import numpy as np
-import requests
-from datetime import datetime, timedelta, timezone
-import altair as alt
-import os
-
-# Импорт функций из power_forecast.py (предполагаем, что они в том же файле)
-# Для простоты скопируем функции сюда или импортируем
+import streamlit as st
+from power_forecast import (
+    get_weather, load_power_table, prepare_hourly_wind, 
+    predict_power, NUM_GENERATORS
+)
 
 st.set_page_config(page_title="Прогноз мощности ВЭС", page_icon="⚡")
 st.title("⚡ Прогноз мощности ветряной электростанции")
-st.write(
-    """
-    Это приложение позволяет прогнозировать мощность ветряной электростанции на основе данных о погоде от OpenWeatherMap.
-    Введите параметры, загрузите таблицу мощности и нажмите "Запустить прогноз".
-    """
-)
 
-# Функции из power_forecast.py
-def get_weather(api_key, lat, lon):
-    url = (
-        f"https://api.openweathermap.org/data/2.5/forecast"
-        f"?lat={lat}&lon={lon}&units=metric&appid={api_key}"
-    )
-    response = requests.get(url, timeout=30)
-    response.raise_for_status()
-    data = response.json()
+st.sidebar.header("Настройки")
+api_key = st.sidebar.text_input("API-ключ OpenWeatherMap", type="password")
+power_file = st.sidebar.text_input("Путь к файлу с таблицей мощности", value="Таблица мощности для прогноза.xlsx")
 
-    if data.get("cod") == "401":
-        raise ValueError(f"Ошибка API: {data.get('message')}")
-    if "list" not in data:
-        raise ValueError(f"Некорректный ответ API: {data}")
+if st.sidebar.button("Запустить прогноз"):
+    if not api_key:
+        st.error("Введите API-ключ!")
+    else:
+        try:
+            data = get_weather(api_key, 50.334336, 58.612371)
+            power_table_df = load_power_table(power_file)
+            df_hourly = prepare_hourly_wind(data)
+            df_hourly = predict_power(df_hourly, power_table_df, NUM_GENERATORS)
+            
+            st.success("Прогноз готов!")
+            st.dataframe(df_hourly[["Время_UTC+1", "Порывы_ветра_м_с", "Мощность_кВт", "Общая_мощность_кВт"]])
+            
+        except Exception as e:
+            st.error(f"Ошибка: {str(e)}")
 
-    return data
-
-def load_power_table_from_df(df_raw):
-    header_row_index = -1
-    for i, row in df_raw.iterrows():
-        if any(
-            pd.notna(cell) and str(cell).strip() == "Скорость ветра (м/с)"
-            for cell in row
-        ):
-            header_row_index = i
-            break
-
-    if header_row_index == -1:
-        raise ValueError(
             "Не удалось найти строку с заголовками 'Скорость ветра (м/с)' в файле."
         )
 

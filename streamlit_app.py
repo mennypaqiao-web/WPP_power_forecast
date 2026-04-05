@@ -113,6 +113,8 @@ def calculate_power(wind_speed, power_df):
     wind_speeds_table = power_df_sorted["Скорость ветра (м/с)"].values
     power_values_table = power_df_sorted["Мощность (кВт)"].values
 
+    if wind_speeds_table.size == 0 or power_values_table.size == 0:
+        return 0
     if wind_speed < wind_speeds_table.min() or wind_speed > wind_speeds_table.max():
         return 0
     return np.interp(wind_speed, wind_speeds_table, power_values_table)
